@@ -1,5 +1,4 @@
 // index.js
-require('dotenv').config();
 const startWA = require('./wa-init');
 const express = require('express');
 
