@@ -1,7 +1,7 @@
 // utils/menu.js
 function evilMenu(prefix) {
-return `
-╔═══《 💀 𝐌𝐑𝐃𝐄𝐕 𝐁𝐔𝐆 𝐁𝐎𝐓 💀 》═══╗
+  return (
+`╔═══《 💀 𝐌𝐑𝐃𝐄𝐕 𝐁𝐔𝐆 𝐁𝐎𝐓 💀 》═══╗
 ║ ⚡ 𝑬𝒗𝒊𝒍 𝑷𝒐𝒘𝒆𝒓 𝑼𝒏𝒍𝒆𝒂𝒔𝒉𝒆𝒅 ⚡
 ║ 🩸 Darkness runs in my code...
 ╚═══════════════════════╝
@@ -21,7 +21,9 @@ return `
 ║ 👤 ${prefix}self       ➝ Switch to evil self mode
 ╚═══════════════════════╝
 
-Powered by ᴬʳᶜᵃⁿᵉ 𓆩𓏶𓆪 𝐌𝐑ܮ𝐃𝐄𝐕
-Contact developer: @Mrddev (Telegram)
-`;
-module.exports = { evilMenu };  
+Powered by MRDEV
+Contact developer: @Mrddev (Telegram)`
+  );
+}
+
+module.exports = { evilMenu };
