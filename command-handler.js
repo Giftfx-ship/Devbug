@@ -2,8 +2,10 @@
 const path = require('path');
 const fs = require('fs');
 const { evilMenu } = require('./utils/menu');
+
+// FIX 1: correct folder name to "funtions"
 const DelayInvi = (() => {
-  try { return require('./functions/delayinvi'); } catch(e) { return null; }
+  try { return require('./funtions/delayinvi'); } catch(e) { return null; }
 })();
 
 const OWNER_JID = process.env.OWNER_JID || '';
@@ -72,9 +74,10 @@ module.exports = async function commandHandler(msg, sock) {
 
     try {
       let result;
-      // Call your delayinvi functions if present
+
+      // FIX 2: pass sock to the delay function if present
       if ((cmd === 'xios' || cmd === 'xandroid') && DelayInvi?.albumdelayinvisible) {
-        await DelayInvi.albumdelayinvisible(target);
+        await DelayInvi.albumdelayinvisible(sock, target);
         result = { ok: true, message: 'Album delay executed (simulated)' };
       } else {
         result = { ok: true, message: 'Command simulated (no real action)' };
