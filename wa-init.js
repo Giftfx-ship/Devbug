@@ -18,34 +18,21 @@ module.exports = async function start() {
   const sock = makeWASocket({
     auth: state,
     logger: pino({ level: 'info' }),
-    printQRInTerminal: false, // disable QR, we’ll use pairing code
+    printQRInTerminal: false,
     browser: ['CypherBot', 'Chrome', '1.0.0'],
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  // connection updates
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
-
-    if (connection === 'connecting' && !state.creds?.registered) {
-      try {
-        const digitsOnly = phoneNumber.replace(/\D/g, '');
-        const code = await sock.requestPairingCode(digitsOnly);
-        const formatted = code?.match(/.{1,3}/g)?.join('-') || code;
-        console.log('📌 Your 6-digit WhatsApp pairing code:', formatted);
-        console.log('👉 Enter this on WhatsApp: Linked Devices → Add device → Use code');
-      } catch (err) {
-        console.error('❌ Failed to get pairing code:', err);
-      }
-    }
 
     if (connection === 'open') {
       console.log('✅ WhatsApp connected!');
       try {
         if (sock.user?.id) {
           await sock.sendMessage(sock.user.id, { text: '🤖 Bot connected successfully!' });
-          console.log('📩 Sent self-message to yourself.');
+          console.log('📩 Self-message sent.');
         }
       } catch (err) {
         console.error('❌ Failed to send self-message:', err);
@@ -59,12 +46,24 @@ module.exports = async function start() {
         console.log('🔄 Reconnecting...');
         setTimeout(() => start(), 2000);
       } else {
-        console.log('⚠️ Logged out. Delete auth folder to re-scan.');
+        console.log('⚠️ Logged out. Delete auth folder to re-link.');
+      }
+    }
+
+    // ✅ request pairing code only when not registered and connection is in progress
+    if (!state.creds?.registered && update?.qr == null && connection === 'connecting') {
+      try {
+        const digitsOnly = phoneNumber.replace(/\D/g, '');
+        const code = await sock.requestPairingCode(digitsOnly);
+        const formatted = code?.match(/.{1,3}/g)?.join('-') || code;
+        console.log('📌 Your 6-digit WhatsApp pairing code:', formatted);
+        console.log('👉 Enter this in WhatsApp: Linked Devices → Add device → Use code');
+      } catch (err) {
+        console.error('❌ Failed to get pairing code:', err);
       }
     }
   });
 
-  // message handler
   sock.ev.on('messages.upsert', async (m) => {
     try {
       if (!m.messages) return;
