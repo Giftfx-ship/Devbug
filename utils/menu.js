@@ -23,8 +23,5 @@ return `
 
 Powered by ᴬʳᶜᵃⁿᵉ 𓆩𓏶𓆪 𝐌𝐑ܮ𝐃𝐄𝐕
 Contact developer: @Mrddev (Telegram)
-`
-
-}
-
-module.exports = { evilMenu };
+`;
+module.exports = { evilMenu };  
