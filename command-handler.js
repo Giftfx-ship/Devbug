@@ -107,13 +107,16 @@ if (xCommands.includes(cmd)) {
 }
 
 // HACKGC (real function file)
-if (cmd === 'hackgc' && HackGC?.runHackGC) {
+if (cmd === 'hackgc' && HackGc?.runHackGC) {
   try {
-    await HackGC.runHackGC(sock, msg, args);
+    await HackGc.runHackGC(sock, msg, args);
     return;
   } catch (err) {
     console.error('HackGC error', err);
     await sendText(sock, from, `⚠ HackGC error: ${String(err).slice(0,800)}`);
     return;
   }
+}
+
+// <<< CLOSE THE exported function
 }
