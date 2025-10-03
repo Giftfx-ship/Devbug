@@ -1,4 +1,3 @@
-// wa-init.js
 const path = require('path');
 const fs = require('fs');
 const pino = require('pino');
@@ -9,6 +8,7 @@ const {
   DisconnectReason
 } = require('@whiskeysockets/baileys');
 const commandHandler = require('./command-handler');
+const { phoneNumber } = require('./config');
 
 const AUTH_DIR = path.resolve('./auth');
 if (!fs.existsSync(AUTH_DIR)) fs.mkdirSync(AUTH_DIR, { recursive: true });
@@ -22,15 +22,16 @@ module.exports = async function start() {
     version,
     auth: state,
     logger: pino({ level: 'info' }),
-    printQRInTerminal: true // 🔹 QR displayed in terminal
+    printQRInTerminal: true
   });
 
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
-    if (qr) {
-      console.log('📲 Scan this QR code with WhatsApp to link your bot!');
+
+    if (!state.creds?.registered && qr) {
+      console.log(`📲 Scan QR code to link ${phoneNumber} on WhatsApp!`);
     }
 
     if (connection === 'close') {
@@ -45,9 +46,9 @@ module.exports = async function start() {
     } else if (connection === 'open') {
       console.log('✅ WhatsApp connected!');
       try {
-        // Send self-message
+        // Self-message
         const selfId = sock.user.id;
-        await sock.sendMessage(selfId, { text: '🤖 Bot started and connected!' });
+        await sock.sendMessage(selfId, { text: '🤖 Bot connected successfully!' });
         console.log('📩 Sent self-message to yourself.');
       } catch (err) {
         console.error('❌ Failed to send self-message:', err);
