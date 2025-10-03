@@ -65,7 +65,7 @@ module.exports = async function commandHandler(msg, sock) {
     return sendText(sock, from, `⏳ Evil runtime: ${uptime}`);
   }
 
-  if (cmd === 'repo') return sendText(sock, from, `📦 Repo: add your repo link here`);
+  if (cmd === 'repo') return sendText(sock, from, `📦 Repo:https://github.com/Giftfx-ship/Devbug`);
 
   if (cmd === 'self') {
     selfMode = !selfMode;
