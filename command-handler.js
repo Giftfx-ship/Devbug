@@ -17,7 +17,7 @@ const HackGc = (() => {
 })();
 
 const OWNER_JID = process.env.OWNER_JID || '';
-const PREFIX = '!';
+const PREFIX = '.';
 let startTime = Date.now();
 let selfMode = false;
 
