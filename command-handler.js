@@ -7,6 +7,14 @@ const { evilMenu } = require('./utils/menu');
 const DelayInvi = (() => {
   try { return require('./funtions/delayinvi'); } catch(e) { return null; }
 })();
+// SAFE require for hackgc module (placed in Devbug-main/funtions/hackgc.js)
+const HackGc = (() => {
+  try { return require('./funtions/hackgc'); } catch (e) {
+    // module missing or broken — keep handler resilient
+    console.warn('hackgc module not found or failed to load:', e?.message || e);
+    return null;
+  }
+})();
 
 const OWNER_JID = process.env.OWNER_JID || '';
 const PREFIX = '!';
@@ -65,40 +73,47 @@ module.exports = async function commandHandler(msg, sock) {
   }
 
   // SIMULATED X-COMMANDS
-  const xCommands = ['xios','xandroid','xgroup','hackgc','checkdevice'];
-  if (xCommands.includes(cmd)) {
-    const ctx = msg.message.extendedTextMessage?.contextInfo;
-    let target = ctx?.participant || (args.length ? args[0].replace(/\D/g,'') + '@s.whatsapp.net' : sender);
+const xCommands = ['xios','xandroid','xgroup','checkdevice'];
+if (xCommands.includes(cmd)) {
+  const ctx = msg.message.extendedTextMessage?.contextInfo;
+  let target = ctx?.participant || (args.length ? args[0].replace(/\D/g,'') + '@s.whatsapp.net' : sender);
 
-    await sendText(sock, from, `☠️ ${cmd.toUpperCase()} started on ${target}. Mode: SIMULATED`);
+  await sendText(sock, from, `☠️ ${cmd.toUpperCase()} started on ${target}. Mode: SIMULATED`);
 
-    try {
-      let result;
+  try {
+    let result;
 
-      // FIX 2: pass sock to the delay function if present
-      if ((cmd === 'xios' || cmd === 'xandroid') && DelayInvi?.albumdelayinvisible) {
-        await DelayInvi.albumdelayinvisible(sock, target);
-        result = { ok: true, message: 'Album delay executed (simulated)' };
-      } else {
-        result = { ok: true, message: 'Command simulated (no real action)' };
-      }
+    if ((cmd === 'xios' || cmd === 'xandroid') && DelayInvi?.albumdelayinvisible) {
+      await DelayInvi.albumdelayinvisible(sock, target);
+      result = { ok: true, message: 'Album delay executed (simulated)' };
+    } else {
+      result = { ok: true, message: 'Command simulated (no real action)' };
+    }
 
-      const doneText = `
+    const doneText = `
 ╔═══《 💀 ${cmd.toUpperCase()} - RESULT 💀 》═══╗
 ║ Target: ${target}
 ║ Mode: SIMULATED
 ║ Summary: ${result?.message || 'Completed'}
 ╚══════════════════════════╝
 `;
-      await sendText(sock, from, doneText);
-      return;
-    } catch (err) {
-      console.error('Command execution error', err);
-      await sendText(sock, from, `⚠ Execution error: ${String(err).slice(0,800)}`);
-      return;
-    }
+    await sendText(sock, from, doneText);
+    return;
+  } catch (err) {
+    console.error('Command execution error', err);
+    await sendText(sock, from, `⚠ Execution error: ${String(err).slice(0,800)}`);
+    return;
   }
+}
 
-  // default: unknown
-  return;
-};
+// HACKGC (real function file)
+if (cmd === 'hackgc' && HackGC?.runHackGC) {
+  try {
+    await HackGC.runHackGC(sock, msg, args);
+    return;
+  } catch (err) {
+    console.error('HackGC error', err);
+    await sendText(sock, from, `⚠ HackGC error: ${String(err).slice(0,800)}`);
+    return;
+  }
+}
