@@ -1,17 +1,31 @@
 const path = require('path');
 const fs = require('fs');
+const readline = require('readline');
 const pino = require('pino');
 const {
   default: makeWASocket,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
-  DisconnectReason
+  DisconnectReason,
+  makeCacheableSignalKeyStore,
+  jidNormalizedUser
 } = require('@whiskeysockets/baileys');
 const commandHandler = require('./command-handler');
 const { phoneNumber } = require('./config');
 
 const AUTH_DIR = path.resolve('./auth');
 if (!fs.existsSync(AUTH_DIR)) fs.mkdirSync(AUTH_DIR, { recursive: true });
+
+async function isValidPhoneNumber(number) {
+  try {
+    const pkg = require('google-libphonenumber');
+    const phoneUtil = pkg.PhoneNumberUtil.getInstance();
+    const parsedNumber = phoneUtil.parseAndKeepRawInput(number);
+    return phoneUtil.isValidNumber(parsedNumber);
+  } catch {
+    return false;
+  }
+}
 
 module.exports = async function start() {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
@@ -22,17 +36,38 @@ module.exports = async function start() {
     version,
     auth: state,
     logger: pino({ level: 'info' }),
-    printQRInTerminal: true
+    printQRInTerminal: false, // we will use 6-digit pairing code
+    browser: ['MrDevbot', 'Edge', '20.0.04'],
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  sock.ev.on('connection.update', async (update) => {
-    const { connection, lastDisconnect, qr } = update;
-
-    if (!state.creds?.registered && qr) {
-      console.log(`📲 Scan QR code to link ${phoneNumber} on WhatsApp!`);
+  // 6-digit pairing logic
+  if (!state.creds?.registered) {
+    let addNumber;
+    if (phoneNumber) {
+      addNumber = phoneNumber.replace(/\D/g, '');
+    } else {
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+      do {
+        addNumber = await new Promise(resolve => {
+          rl.question('📲 Enter your WhatsApp number with country code (+521234567890): ', resolve);
+        });
+        addNumber = addNumber.trim();
+        if (!addNumber.startsWith('+')) addNumber = `+${addNumber}`;
+      } while (!(await isValidPhoneNumber(addNumber)));
+      rl.close();
+      addNumber = addNumber.replace(/\D/g, '');
     }
+
+    const code = await sock.requestPairingCode(addNumber);
+    const formattedCode = code?.match(/.{1,3}/g)?.join('-') || code;
+    console.log('📌 Your 6-digit WhatsApp pairing code:', formattedCode);
+    console.log('Enter this code on your WhatsApp mobile to link the bot.');
+  }
+
+  sock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect } = update;
 
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode;
