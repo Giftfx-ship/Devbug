@@ -13,11 +13,11 @@ const {
   jidNormalizedUser
 } = require('@whiskeysockets/baileys');
 
-const commandHandler = require('.command-handler.js');
+const commandHandler = require('./command-handler');
 
 const ROOT = path.resolve('.');
 const AUTH_DIR = path.join(ROOT, 'auth');
-const CONFIG_FILE = path.join(ROOT, 'config.js');
+const CONFIG_FILE = path.join(ROOT, 'config.json');
 
 if (!fs.existsSync(AUTH_DIR)) fs.mkdirSync(AUTH_DIR, { recursive: true });
 
@@ -27,9 +27,9 @@ try {
   if (fs.existsSync(CONFIG_FILE)) {
     const raw = fs.readFileSync(CONFIG_FILE, 'utf8');
     config = JSON.parse(raw || '{}');
-    console.log('Loaded config.js:', Object.keys(config).length ? 'OK' : 'empty');
+    console.log('Loaded config.json:', Object.keys(config).length ? 'OK' : 'empty');
   } else {
-    console.log('No config.js found — falling back to env vars for PHONE_FOR_PAIR.');
+    console.log('No config.json found — falling back to env vars for PHONE_FOR_PAIR.');
   }
 } catch (e) {
   console.warn('Failed to load config.json:', e?.message || e);
