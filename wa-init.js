@@ -19,7 +19,7 @@ module.exports = async function start() {
     auth: state,
     logger: pino({ level: 'info' }),
     printQRInTerminal: false,
-    browser: ['CypherBot', 'Chrome', '1.0.0'],
+    browser: ['Microsoft Edge', 'Ubuntu', '1.0.0'],
   });
 
   sock.ev.on('creds.update', saveCreds);
