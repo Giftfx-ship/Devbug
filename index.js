@@ -1,9 +1,9 @@
 // index.js
-const startWA = require('./wa-init');
+const start = require('./wa-init'); // default export from wa-init.js
 
 (async () => {
   try {
-    const sock = await startWA();
+    const sock = await start();
     console.log('✅ WhatsApp bot started successfully!');
 
     // Self-test: send a message to yourself once connected
