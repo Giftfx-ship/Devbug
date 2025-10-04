@@ -13,7 +13,7 @@ const {
   jidNormalizedUser
 } = require('@whiskeysockets/baileys');
 
-const commandHandler = require('./command-handler');
+const commandHandler = require('.command-handler.js');
 
 const ROOT = path.resolve('.');
 const AUTH_DIR = path.join(ROOT, 'auth');
