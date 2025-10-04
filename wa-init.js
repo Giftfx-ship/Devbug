@@ -1,4 +1,4 @@
-// wa-init.js — BAILEYS starter using config.json or env for phone (non-interactive)
+// wa-pair.js — pairing-only helper: requests & prints 6-digit pairing token
 const path = require('path');
 const fs = require('fs');
 const pino = require('pino');
@@ -8,172 +8,114 @@ const {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
   DisconnectReason,
-  Browsers,
-  makeInMemoryStore,
-  jidNormalizedUser
+  Browsers
 } = require('@whiskeysockets/baileys');
 
-const commandHandler = require('./command-handler');
-
-const ROOT = path.resolve('.');
-const AUTH_DIR = path.join(ROOT, 'auth');
-const CONFIG_FILE = path.join(ROOT, 'config.js');
-
-if (!fs.existsSync(AUTH_DIR)) fs.mkdirSync(AUTH_DIR, { recursive: true });
-
-// load config.json if present
+const CONFIG_PATH = path.join(process.cwd(), 'config.js'); // expects module.exports = { PHONE_FOR_PAIR: '234...' }
 let config = {};
-try {
-  if (fs.existsSync(CONFIG_FILE)) {
-    const raw = fs.readFileSync(CONFIG_FILE, 'utf8');
-    config = JSON.parse(raw || '{}');
-    console.log('Loaded config.js:', Object.keys(config).length ? 'OK' : 'empty');
-  } else {
-    console.log('No config.js found — falling back to env vars for PHONE_FOR_PAIR.');
-  }
-} catch (e) {
-  console.warn('Failed to load config.js:', e?.message || e);
-  config = {};
+try { config = require(CONFIG_PATH); } catch (e) { console.warn('No config.js found or it failed to load — falling back to env PHONE_FOR_PAIR'); }
+
+const PHONE_FOR_PAIR = (config.PHONE_FOR_PAIR || process.env.PHONE_FOR_PAIR || '').toString().trim();
+const AUTH_DIR = path.resolve('./auth_pair'); // separate folder for pairing session (persist this)
+
+if (!PHONE_FOR_PAIR) {
+  console.error('ERROR: PHONE_FOR_PAIR not set in config.js and not present in env PHONE_FOR_PAIR.');
+  console.error('Set config.js: module.exports = { PHONE_FOR_PAIR: "2349164624021" } or set env PHONE_FOR_PAIR.');
+  process.exit(1);
 }
 
-// in-memory store (bind to socket for history)
-const store = makeInMemoryStore({ logger: pino({ level: 'silent' }) });
-
-function extract6DigitFromStr(s) {
+// small helper to extract a 6-digit token from string
+function extract6(s) {
   if (!s) return null;
   const digits = String(s).replace(/\D/g, '');
   if (digits.length >= 6) return digits.slice(0, 6);
   return null;
 }
 
-module.exports = async function start() {
+async function run() {
+  if (!fs.existsSync(AUTH_DIR)) fs.mkdirSync(AUTH_DIR, { recursive: true });
+
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-  const { version, isLatest } = await fetchLatestBaileysVersion();
-  console.log(`Using WA version v${version.join('.')}, latest: ${isLatest}`);
+  const { version } = await fetchLatestBaileysVersion().catch(()=>({ version: [2,3000,1023223821] }));
+  console.log(`Using WA version v${version.join('.')}`);
 
-  // prefer config.json phone setting; fallback to env var PHONE_FOR_PAIR
-  const phoneFromConfig = (config.phone || config.phoneForPair || '').toString().trim();
-  const PHONE_FOR_PAIR = phoneFromConfig || (process.env.PHONE_FOR_PAIR || '').trim();
-  const PRINT_QR = (process.env.PRINT_QR === 'true');
-
-  // configure socket (using your preferred options)
-  const leo = makeWASocket({
+  // create socket (no store)
+  const sock = makeWASocket({
     logger: pino({ level: 'silent' }),
-    printQRInTerminal: !!PRINT_QR,
+    printQRInTerminal: false,
     auth: state,
-    version: [2, 3000, 1023223821],
-    browser: Browsers.ubuntu("Edge"),
-    getMessage: async key => {
-      try {
-        const jid = jidNormalizedUser(key.remoteJid);
-        const msg = await store.loadMessage(jid, key.id);
-        return msg?.message || '';
-      } catch (e) {
-        return '';
-      }
-    },
-    shouldSyncHistoryMessage: msg => {
-      try {
-        if (typeof msg.progress !== 'undefined') {
-          console.log(`\x1b[32mLoading Chat [${msg.progress}%]\x1b[39m`);
-        }
-        return !!msg.syncType;
-      } catch (e) {
-        return false;
-      }
-    },
-  }, store);
+    version,
+    browser: Browsers.ubuntu('Edge'),
+    getMessage: async () => '' // no store
+  });
 
-  // bind store
-  store.bind(leo.ev);
-
-  // Save creds on update
-  leo.ev.on('creds.update', saveCreds);
+  // save creds on update
+  sock.ev.on('creds.update', saveCreds);
 
   let pairingRequested = false;
   async function requestPairingOnce() {
     if (pairingRequested) return;
     pairingRequested = true;
-
-    if (!PHONE_FOR_PAIR) {
-      console.warn('No phone number configured for pairing. Set config.json { "phone": "234911..." } or PHONE_FOR_PAIR env var.');
-      return;
-    }
-
     try {
       console.log(`Requesting pairing code for ${PHONE_FOR_PAIR} ...`);
-      const pairingResp = await leo.requestPairingCode(PHONE_FOR_PAIR);
-      const short = extract6DigitFromStr(String(pairingResp));
-      console.log('📲 Raw pairing response:', pairingResp);
-      if (short) {
-        console.log('🔐 6-digit pairing token (enter on phone -> Linked devices -> Link a device):', short);
+      const resp = await sock.requestPairingCode(PHONE_FOR_PAIR);
+      console.log('Raw pairing response:', resp);
+      const token = extract6(String(resp));
+      if (token) {
+        console.log('📲 6-digit pairing token (enter in WhatsApp -> Linked devices -> Link a device -> Enter code):', token);
       } else {
-        console.log('🔐 Pairing response received. If WhatsApp expects a code, check the raw pairing response above.');
+        console.log('Pairing response received. If WhatsApp expects a code, check the raw pairing response above.');
       }
     } catch (err) {
-      console.warn('⚠️ Pairing request failed:', err?.message || err);
+      console.error('Pairing request failed:', err?.message || err);
     }
   }
 
-  // handle connection updates
-  leo.ev.on('connection.update', async (update) => {
+  // Listen for connection updates — some Baileys builds put the token in update fields
+  sock.ev.on('connection.update', async (update) => {
     try {
       const u = Object.assign({}, update);
-      if (u.qr && !PRINT_QR) u.qr = '<<QR_PRESENT>>';
+      if (u.qr) u.qr = '<<QR_PRESENT>>';
       console.log('connection.update', u);
 
-      // attempt to extract 6-digit token from possible fields
-      const candidates = [update.code, update.pairingCode, update.qr].filter(Boolean);
-      let token = null;
-      for (const c of candidates) {
-        token = extract6DigitFromStr(String(c));
-        if (token) break;
-      }
-      if (token) {
-        console.log('📲 6-digit pairing token (enter on phone -> Linked devices -> Link a device):', token);
-      } else if (update.qr && !PRINT_QR) {
-        console.log('📲 Pairing QR available; set PRINT_QR=true to display it in terminal.');
+      // try to extract token from update fields
+      const fields = [update.code, update.pairingCode, update.qr].filter(Boolean);
+      for (const f of fields) {
+        const token = extract6(String(f));
+        if (token) {
+          console.log('📲 6-digit pairing token (enter on phone -> Linked devices -> Link a device):', token);
+        }
       }
 
-      // if not registered yet, request pairing automatically (non-interactive)
+      // If not registered, trigger pairing request once
       if (!state.creds?.registered) {
         await requestPairingOnce();
       }
 
+      // handle close / logged out
       const { connection, lastDisconnect } = update;
       if (connection === 'close') {
         const code = lastDisconnect?.error?.output?.statusCode;
         console.log('Connection closed, statusCode=', code);
-        if (code !== DisconnectReason.loggedOut) {
-          console.log('Reconnecting (exiting to let supervisor restart)...');
-          setTimeout(() => process.exit(0), 1500);
-        } else {
-          console.log('Logged out. Delete auth folder to re-scan.');
+        if (code === DisconnectReason.loggedOut) {
+          console.log('Logged out. Remove the auth folder and re-run to request a fresh pairing.');
         }
       } else if (connection === 'open') {
-        console.log('✅ WhatsApp connected (socket open).');
+        console.log('✅ Connected — if you paired successfully the session is stored in', AUTH_DIR);
       }
     } catch (e) {
       console.error('connection.update handler error', e);
     }
   });
 
-  // messages -> command handler
-  leo.ev.on('messages.upsert', async (m) => {
-    try {
-      if (!m.messages) return;
-      const msg = m.messages[0];
-      if (!msg.message) return;
-      if (msg.key && msg.key.fromMe) return; // ignore own messages
-      await commandHandler(msg, leo);
-    } catch (e) {
-      console.error('messages.upsert error', e);
-    }
+  // minimal messages handler (keep process alive)
+  sock.ev.on('messages.upsert', m => {
+    // noop — pairing script doesn't handle commands
   });
 
-  // expose socket globally for debugging
-  global.MRDEV_SOCK = leo;
-  console.log('✅ MRDEV_SOCK available as global.MRDEV_SOCK');
+  // expose sock for debug (optional)
+  global.MRDEV_PAIR_SOCK = sock;
+  console.log('Pairing helper started — watching console for token output.');
+}
 
-  return leo;
-};
+run().catch(err => { console.error('Fatal error', err); process.exit(1); });
