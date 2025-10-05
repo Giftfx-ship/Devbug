@@ -1,10 +1,10 @@
-// Add near the top of Devbug-main/funtions/delayinvi.js
+
 const { proto, generateWAMessageFromContent } = require('@whiskeysockets/baileys');
 const crypto = require('crypto');
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-// Replace the original function with this version
+
 async function albumdelayinvisible(sock, target, options = {}) {
   if (!sock) throw new Error('albumdelayinvisible: missing sock');
   if (!target) throw new Error('albumdelayinvisible: missing target');
